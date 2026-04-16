@@ -1,4 +1,5 @@
-include("lib.jl")
+include("cafe.jl")
+include("bad.jl")
 
 using Random
 
