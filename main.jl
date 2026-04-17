@@ -15,6 +15,7 @@ output = net(input)
 loss = bce(output, target)
 model = graph(loss)
 
+# %%
 function data(N)
   c = ([-1, -1], [-1, +1], [+1, -1], [+1, +1])
   y = (0, 1, 1, 0)
