@@ -7,7 +7,7 @@ function prepare_data(data)
     x_data = Vector{Array{Float32,3}}(undef, N)
     d_data = Vector{Vector{Float32}}(undef, N)
     for i in 1:N
-        x_data[i] = reshape(Float32.(data.features[:, :, i]) ./ 255., 1, 28, 28)
+        x_data[i] = reshape(Float32.(data.features[:, :, i]), 1, 28, 28)
         d = zeros(Float32, 10)
         d[data.targets[i]+1] = 1.0
         d_data[i] = d
@@ -49,6 +49,7 @@ settings = (
 )
 
 using Random
+Random.seed!(1234)
 
 function test(model, x_test, d_test)
     correct = 0
@@ -70,6 +71,7 @@ function test(model, x_test, d_test)
     return acc * 100
 end
 
+# TODO: Implement minibatch
 function train!(model, batch, x_train, d_train)
     shuffle!(batch)
     L = 0.0
@@ -78,31 +80,31 @@ function train!(model, batch, x_train, d_train)
         forward!(model,
             input => x_train[sample],
             target => d_train[sample])
-        for (i, node) in enumerate(model)
-            if any(isnan, node.data) || any(isinf, node.data)
-                println("PREV NODE DATA")
-                println("i = ", i - 1)
-                println("node = ", model[i-1])
-                println("size = ", size(model[i-1].data))
-                println("data = ", model[i-1].data)
-
-                println("BAD NODE DATA")
-                println("i = ", i)
-                println("node = ", node)
-                println("size = ", size(node.data))
-                println("data = ", node.data)
-                error("node data exploded")
-            end
-        end
+        # for (i, node) in enumerate(model)
+        #     if any(isnan, node.data) || any(isinf, node.data)
+        #         println("PREV NODE DATA")
+        #         println("i = ", i - 1)
+        #         println("node = ", model[i-1])
+        #         println("size = ", size(model[i-1].data))
+        #         println("data = ", model[i-1].data)
+        #
+        #         println("BAD NODE DATA")
+        #         println("i = ", i)
+        #         println("node = ", node)
+        #         println("size = ", size(node.data))
+        #         println("data = ", node.data)
+        #         error("node data exploded")
+        #     end
+        # end
         backward!(model)
-        for (i, node) in enumerate(model)
-            if any(isnan, node.grad) || any(isinf, node.grad)
-                println("BAD GRAD in node ", i, " -> ", node)
-                println("data = ", node.data)
-                println("grad = ", node.grad)
-                error("gradient exploded")
-            end
-        end
+        # for (i, node) in enumerate(model)
+        #     if any(isnan, node.grad) || any(isinf, node.grad)
+        #         println("BAD GRAD in node ", i, " -> ", node)
+        #         println("data = ", node.data)
+        #         println("grad = ", node.grad)
+        #         error("gradient exploded")
+        #     end
+        # end
         L += model[end].data[1]
         optimize!(model, settings.learning_rate)
     end

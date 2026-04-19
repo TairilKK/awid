@@ -266,83 +266,7 @@ function adjoint!(y::GraphNode{:conv,3})
 end
 # NOTE: CONVOLUTION END
 
-# function primal!(y::GraphNode{:maxpool,1})
-#   x, = y.args
-#   X = x.data
-#
-#   C, H, W = size(X)
-#   _, out_h, out_w = size(y.data)
-#
-#   kh = H ÷ out_h
-#   kw = W ÷ out_w
-#
-#   fill!(y.data, 0)
-#
-#   for c in 1:C
-#     for oh in 1:out_h
-#       for ow in 1:out_w
-#         h_start = (oh - 1) * kh + 1
-#         h_end = oh * kh
-#         w_start = (ow - 1) * kw + 1
-#         w_end = ow * kw
-#
-#         m = -Inf
-#         for i in h_start:h_end
-#           for j in w_start:w_end
-#             if X[c, i, j] > m
-#               m = X[c, i, j]
-#             end
-#           end
-#         end
-#
-#         y.data[c, oh, ow] = m
-#       end
-#     end
-#   end
-#
-#   return nothing
-# end
-# function adjoint!(y::GraphNode{:maxpool,1})
-#   x, = y.args
-#   X = x.data
-#   GY = y.grad
-#
-#   C, H, W = size(X)
-#   _, out_h, out_w = size(y.data)
-#
-#   kh = H ÷ out_h
-#   kw = W ÷ out_w
-#
-#   for c in 1:C
-#     for oh in 1:out_h
-#       for ow in 1:out_w
-#         h_start = (oh - 1) * kh + 1
-#         h_end = oh * kh
-#         w_start = (ow - 1) * kw + 1
-#         w_end = ow * kw
-#
-#         max_i = h_start
-#         max_j = w_start
-#         max_val = X[c, h_start, w_start]
-#
-#         for i in h_start:h_end
-#           for j in w_start:w_end
-#             if X[c, i, j] > max_val
-#               max_val = X[c, i, j]
-#               max_i = i
-#               max_j = j
-#             end
-#           end
-#         end
-#
-#         x.grad[c, max_i, max_j] += GY[c, oh, ow]
-#       end
-#     end
-#   end
-#
-#   return nothing
-# end
-
+# TODO: Optimize
 function primal!(y::GraphNode{:maxpool,1})
   x, = y.args
   X = x.data
@@ -381,7 +305,6 @@ function primal!(y::GraphNode{:maxpool,1})
 
   return nothing
 end
-
 function adjoint!(y::GraphNode{:maxpool,1})
   x, = y.args
   X = x.data
@@ -427,9 +350,6 @@ function adjoint!(y::GraphNode{:maxpool,1})
 end
 
 
-
-
-
 function primal!(y::GraphNode{:flatten,1})
   x, = y.args
   y.data .= reshape(x.data, :)
@@ -441,26 +361,7 @@ function adjoint!(y::GraphNode{:flatten,1})
   return nothing
 end
 
-# function primal!(y::GraphNode{:dropout,3})
-#   x, probnode, masknode = y.args
-#   p = probnode.data[1]
-#   scale = 1.0 / (1.0 - p)
-#   for i in eachindex(x.data)
-#     if rand() < p
-#       masknode.data[i] = 0.0
-#     else
-#       masknode.data[i] = scale
-#     end
-#   end
-#   y.data .= x.data .* masknode.data
-#   return nothing
-# end
-# function adjoint!(y::GraphNode{:dropout,3})
-#   x, probnode, masknode = y.args
-#   x.grad .+= y.grad .* masknode.data
-#   return nothing
-# end
-
+# TODO: Implement zeros for eval
 function primal!(y::GraphNode{:dropout,3})
   x, probnode, masknode = y.args
   p = probnode.data[1]
@@ -485,7 +386,6 @@ function primal!(y::GraphNode{:dropout,3})
 
   return nothing
 end
-
 function adjoint!(y::GraphNode{:dropout,3})
   x, probnode, masknode = y.args
   xg = x.grad
@@ -503,20 +403,12 @@ function primal!(z::GraphNode{:lce})
   x, y = z.args
 
   m = maximum(x.data)
-  lse = m + log(sum(exp.(x.data .- m)))   # log-sum-exp
-  cls = argmax(y.data)                    # target one-hot
+  lse = m + log(sum(exp.(x.data .- m)))
+  cls = argmax(y.data)
 
   z.data[1] = -(x.data[cls] - lse)
   return nothing
 end
-# function primal!(z::GraphNode{:lce})
-#   x, y = z.args
-#   ex = exp.(x.data .- maximum(x.data))
-#   soft = ex ./ sum(ex)
-#   logsoft = log.(soft)
-#   z.data[1] = -sum(y.data .* logsoft)
-#   return nothing
-# end
 function adjoint!(z::GraphNode{:lce})
   x, y = z.args
   ex = exp.(x.data .- maximum(x.data))
@@ -524,14 +416,6 @@ function adjoint!(z::GraphNode{:lce})
   x.grad .+= z.grad[1] .* (soft .- y.data)
   return nothing
 end
-# function adjoint!(z::GraphNode{:lce})
-#   x, y = z.args
-#   ex = exp.(x.data .- maximum(x.data))
-#   soft = ex ./ sum(ex)
-#   grad = soft .- y.data
-#   x.grad .+= grad
-#   return nothing
-# end
 
 function primal!(y::GraphNode{:softmax})
   x = y.args[1]

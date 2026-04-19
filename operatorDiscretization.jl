@@ -19,7 +19,8 @@ end
 function (y::Dense)(x)
   n = y.insize
   m = y.outsize
-  W = GraphNode(randn(m, n), true)
+  W = GraphNode(0.01f0 * randn(m, n), true)
+  # W = GraphNode(2 * rand(m, n) .- 1, true)
   b = GraphNode(randn(m), true)
   mul = GraphNode(:mul, (W, x), zeros(m))
   add = GraphNode(:add, (mul, b), zeros(m))
@@ -38,7 +39,8 @@ function (y::Conv)(x)
   pad = y.pad
 
   padnode = GraphNode([pad])
-  kernels = GraphNode(randn(out_channels, in_channels, kh, kw), true)
+  kernels = GraphNode(0.01f0 * randn(out_channels, in_channels, kh, kw), true)
+  # kernels = GraphNode(2 * rand(out_channels, in_channels, kh, kw) .- 1, true)
 
   _, H, W = size(x.data)
   out_h = H + 2pad - kh + 1
