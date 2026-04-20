@@ -33,7 +33,7 @@ net = chain((
     maxpool((2, 2)),
     flatten(),
     dense(784 => 84, relu),
-    dropout(0.),
+    dropout(0.4),
     dense(84 => 10),
 ))
 input = tensor(1, 28, 28)
@@ -80,41 +80,19 @@ function train!(model, batch, x_train, d_train)
         forward!(model,
             input => x_train[sample],
             target => d_train[sample])
-        # for (i, node) in enumerate(model)
-        #     if any(isnan, node.data) || any(isinf, node.data)
-        #         println("PREV NODE DATA")
-        #         println("i = ", i - 1)
-        #         println("node = ", model[i-1])
-        #         println("size = ", size(model[i-1].data))
-        #         println("data = ", model[i-1].data)
-        #
-        #         println("BAD NODE DATA")
-        #         println("i = ", i)
-        #         println("node = ", node)
-        #         println("size = ", size(node.data))
-        #         println("data = ", node.data)
-        #         error("node data exploded")
-        #     end
-        # end
         backward!(model)
-        # for (i, node) in enumerate(model)
-        #     if any(isnan, node.grad) || any(isinf, node.grad)
-        #         println("BAD GRAD in node ", i, " -> ", node)
-        #         println("data = ", node.data)
-        #         println("grad = ", node.grad)
-        #         error("gradient exploded")
-        #     end
-        # end
         L += model[end].data[1]
         optimize!(model, settings.learning_rate)
     end
-    return L
+    return L / length(batch)
 end
 
-for _ in 1:settings.epoch
-    @time L = train!(model, settings.batch, x_train, d_train)
+@time for _ in 1:settings.epoch
+    L = train!(model, settings.batch, x_train, d_train)
     print("Loss: ")
     println(L)
 end
 
+evalmode!()
+# trainmode!()
 test(model, x_test, d_test)

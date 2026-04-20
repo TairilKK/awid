@@ -33,3 +33,10 @@ function (chain::Chain)(x)
   end
   return node
 end
+
+
+# For DropOut
+const IS_TRAINING = Ref(true)
+
+trainmode!() = (IS_TRAINING[] = true)
+evalmode!() = (IS_TRAINING[] = false)

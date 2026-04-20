@@ -40,7 +40,7 @@ function build_model()
         flatten(),
         dense(784 => 84, relu),
         dropout(0.),
-        dense(84 => 10, softmax),
+        dense(84 => 10),
     ))
 
     input = tensor(1, 28, 28)

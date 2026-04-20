@@ -267,11 +267,51 @@ end
 # NOTE: CONVOLUTION END
 
 # TODO: Optimize
+# function primal!(y::GraphNode{:maxpool,1})
+#   x, = y.args
+#   X = x.data
+#   Y = y.data
+#
+#   C, H, W = size(X)
+#   _, out_h, out_w = size(Y)
+#
+#   kh = H ÷ out_h
+#   kw = W ÷ out_w
+#
+#   @inbounds for c in 1:C
+#     for oh in 1:out_h
+#       h_start = (oh - 1) * kh + 1
+#       h_end = oh * kh
+#
+#       for ow in 1:out_w
+#         w_start = (ow - 1) * kw + 1
+#         w_end = ow * kw
+#
+#         best = X[c, h_start, w_start]
+#
+#         for i in h_start:h_end
+#           for j in w_start:w_end
+#             v = X[c, i, j]
+#             if v > best
+#               best = v
+#             end
+#           end
+#         end
+#
+#         Y[c, oh, ow] = best
+#       end
+#     end
+#   end
+#
+#   return nothing
+# end
 function primal!(y::GraphNode{:maxpool,1})
   x, = y.args
-  X = x.data
-  Y = y.data
-
+  _maxpool_primal!(y.data, x.data)
+  return nothing
+end
+# function _maxpool_primal!(Y::AbstractArray{T,3}, X::AbstractArray{T,3}) where {T}
+function _maxpool_primal!(Y::Array{T,3}, X::Array{T,3}) where {T}
   C, H, W = size(X)
   _, out_h, out_w = size(Y)
 
@@ -305,14 +345,63 @@ function primal!(y::GraphNode{:maxpool,1})
 
   return nothing
 end
+# function adjoint!(y::GraphNode{:maxpool,1})
+#   x, = y.args
+#   X = x.data
+#   GY = y.grad
+#   XG = x.grad
+#
+#   C, H, W = size(X)
+#   _, out_h, out_w = size(y.data)
+#
+#   kh = H ÷ out_h
+#   kw = W ÷ out_w
+#
+#   @inbounds for c in 1:C
+#     for oh in 1:out_h
+#       h_start = (oh - 1) * kh + 1
+#       h_end = oh * kh
+#
+#       for ow in 1:out_w
+#         w_start = (ow - 1) * kw + 1
+#         w_end = ow * kw
+#
+#         best_i = h_start
+#         best_j = w_start
+#         best = X[c, h_start, w_start]
+#
+#         for i in h_start:h_end
+#           for j in w_start:w_end
+#             v = X[c, i, j]
+#             if v > best
+#               best = v
+#               best_i = i
+#               best_j = j
+#             end
+#           end
+#         end
+#
+#         XG[c, best_i, best_j] += GY[c, oh, ow]
+#       end
+#     end
+#   end
+#
+#   return nothing
+# end
 function adjoint!(y::GraphNode{:maxpool,1})
   x, = y.args
-  X = x.data
-  GY = y.grad
-  XG = x.grad
+  _maxpool_adjoint!(x.grad, y.grad, x.data, y.data)
+  return nothing
+end
 
+function _maxpool_adjoint!(
+  XG::AbstractArray{T,3},
+  GY::AbstractArray{T,3},
+  X::AbstractArray{T,3},
+  Y::AbstractArray{T,3},
+) where {T}
   C, H, W = size(X)
-  _, out_h, out_w = size(y.data)
+  _, out_h, out_w = size(Y)
 
   kh = H ÷ out_h
   kw = W ÷ out_w
@@ -348,8 +437,6 @@ function adjoint!(y::GraphNode{:maxpool,1})
 
   return nothing
 end
-
-
 function primal!(y::GraphNode{:flatten,1})
   x, = y.args
   y.data .= reshape(x.data, :)
@@ -361,18 +448,27 @@ function adjoint!(y::GraphNode{:flatten,1})
   return nothing
 end
 
-# TODO: Implement zeros for eval
 function primal!(y::GraphNode{:dropout,3})
   x, probnode, masknode = y.args
   p = probnode.data[1]
 
-  T = eltype(x.data)
-  scale = inv(one(T) - p)
-  zeroT = zero(T)
-
   xd = x.data
   yd = y.data
   md = masknode.data
+
+  T = eltype(xd)
+  oneT = one(T)
+  zeroT = zero(T)
+
+  if !IS_TRAINING[]
+    @inbounds for i in eachindex(xd, yd, md)
+      md[i] = oneT
+      yd[i] = xd[i]
+    end
+    return nothing
+  end
+
+  scale = inv(oneT - p)
 
   @inbounds for i in eachindex(xd, yd, md)
     if rand() < p
