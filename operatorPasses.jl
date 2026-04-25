@@ -89,7 +89,6 @@ function adjoint!(y::GraphNode{:sigmoid,1})
   return nothing
 end
 
-# NOTE: [ Conv Helpers ] ------------------------------------------------------
 function get_cache_matrix!(cache::Dict{Symbol,Any}, key::Symbol, T, dims::Tuple)
   if !haskey(cache, key) || size(cache[key]) != dims || eltype(cache[key]) != T
     cache[key] = Matrix{T}(undef, dims...)
@@ -98,55 +97,44 @@ function get_cache_matrix!(cache::Dict{Symbol,Any}, key::Symbol, T, dims::Tuple)
 end
 function im2col_pad!(cols, X, KH, KW, pad)
   IC, H, W = size(X)
-
   Hp = H + 2 * pad
   Wp = W + 2 * pad
   out_h = Hp - KH + 1
   out_w = Wp - KW + 1
 
   col = 1
-  @inbounds for ow in 1:out_w
-    for oh in 1:out_h
-
-      idx = 1
-      for j in 1:KW
-        for i in 1:KH
-          hi = oh + i - pad - 1
-          wi = ow + j - pad - 1
-          for ic in 1:IC
-            if 1 <= hi <= H && 1 <= wi <= W
-              cols[idx, col] = X[ic, hi, wi]
-            else
-              cols[idx, col] = zero(eltype(X))
-            end
-            idx += 1
-          end
+  for ow in 1:out_w, oh in 1:out_h
+    idx = 1
+    for j in 1:KW, i in 1:KH
+      hi = oh + i - pad - 1
+      wi = ow + j - pad - 1
+      for ic in 1:IC
+        if 1 <= hi <= H && 1 <= wi <= W
+          cols[idx, col] = X[ic, hi, wi]
+        else
+          cols[idx, col] = zero(eltype(X))
         end
+        idx += 1
       end
-
-      col += 1
     end
+    col += 1
   end
 
   return cols
 end
-# NOTE: ] Conv Helpers [ ------------------------------------------------------
 function primal!(y::GraphNode{:conv,3})
   kernels, x, padnode = y.args
-  pad = padnode.data[1]
-
+  pad = Int32(padnode.data[1])
   W = kernels.data
   X = x.data
   Y = y.data
 
   OC, IC, KH, KW = size(W)
   ICx, H, WW = size(X)
-
   @assert IC == ICx
 
   out_h = H + 2 * pad - KH + 1
   out_w = WW + 2 * pad - KW + 1
-
   @assert size(Y) == (OC, out_h, out_w)
 
   T = promote_type(eltype(X), eltype(W))
@@ -157,12 +145,11 @@ function primal!(y::GraphNode{:conv,3})
 
   Wcol = reshape(W, OC, IC * KH * KW)
   Ycol = reshape(Y, OC, out_h * out_w)
-
   mul!(Ycol, Wcol, Xcol)
 
   return nothing
 end
-### NOTE: [ Conv Helpers ] ----------------------------------------------------
+
 function col2im_pad!(dx, cols, KH, KW, pad)
   IC, H, W = size(dx)
 
@@ -171,64 +158,27 @@ function col2im_pad!(dx, cols, KH, KW, pad)
   out_h = Hp - KH + 1
   out_w = Wp - KW + 1
 
-  fill!(dx, zero(eltype(dx)))
-
   col = 1
-  @inbounds for ow in 1:out_w
-    for oh in 1:out_h
-      idx = 1
-      for j in 1:KW
-        for i in 1:KH
-          hi = oh + i - pad - 1
-          wi = ow + j - pad - 1
-          for ic in 1:IC
-            if 1 <= hi <= H && 1 <= wi <= W
-              dx[ic, hi, wi] += cols[idx, col]
-            end
-            idx += 1
-          end
+  for ow in 1:out_w, oh in 1:out_h
+    idx = 1
+    for j in 1:KW, i in 1:KH
+      hi = oh + i - pad - 1
+      wi = ow + j - pad - 1
+      for ic in 1:IC
+        if 1 <= hi <= H && 1 <= wi <= W
+          dx[ic, hi, wi] += cols[idx, col]
         end
+        idx += 1
       end
-      col += 1
     end
+    col += 1
   end
 
   return dx
 end
-function col2im_pad_add!(dx, cols, KH, KW, pad)
-  IC, H, W = size(dx)
-
-  Hp = H + 2 * pad
-  Wp = W + 2 * pad
-  out_h = Hp - KH + 1
-  out_w = Wp - KW + 1
-
-  col = 1
-  @inbounds for ow in 1:out_w
-    for oh in 1:out_h
-      idx = 1
-      for j in 1:KW
-        for i in 1:KH
-          hi = oh + i - pad - 1
-          wi = ow + j - pad - 1
-          for ic in 1:IC
-            if 1 <= hi <= H && 1 <= wi <= W
-              dx[ic, hi, wi] += cols[idx, col]
-            end
-            idx += 1
-          end
-        end
-      end
-      col += 1
-    end
-  end
-
-  return dx
-end
-### NOTE: ] Conv Helpers [ ----------------------------------------------------
 function adjoint!(y::GraphNode{:conv,3})
   kernels, x, padnode = y.args
-  pad = padnode.data[1]
+  pad = Int64(padnode.data[1])
 
   W = kernels.data
   X = x.data
@@ -243,74 +193,29 @@ function adjoint!(y::GraphNode{:conv,3})
 
   T = promote_type(eltype(W), eltype(X), eltype(GY))
 
-  # to samo Xcol co w primal
   Xcol = get_cache_matrix!(y.cache, :Xcol, T, (IC * KH * KW, out_h * out_w))
   im2col_pad!(Xcol, X, KH, KW, pad)
 
   Wcol = reshape(W, OC, IC * KH * KW)
   GYcol = reshape(GY, OC, out_h * out_w)
 
-  # dW = GYcol * Xcol'
   dWcol = get_cache_matrix!(y.cache, :dWcol, T, (OC, IC * KH * KW))
   mul!(dWcol, GYcol, Xcol')
 
-  # dxcol = Wcol' * GYcol
   dXcol = get_cache_matrix!(y.cache, :dXcol, T, (IC * KH * KW, out_h * out_w))
   mul!(dXcol, Wcol', GYcol)
 
-  # akumulacja do gradients
   kernels.grad .+= reshape(dWcol, size(W)...)
-  col2im_pad_add!(x.grad, dXcol, KH, KW, pad)
+  col2im_pad!(x.grad, dXcol, KH, KW, pad)
 
   return nothing
 end
-# NOTE: CONVOLUTION END
 
-# TODO: Optimize
-# function primal!(y::GraphNode{:maxpool,1})
-#   x, = y.args
-#   X = x.data
-#   Y = y.data
-#
-#   C, H, W = size(X)
-#   _, out_h, out_w = size(Y)
-#
-#   kh = H ÷ out_h
-#   kw = W ÷ out_w
-#
-#   @inbounds for c in 1:C
-#     for oh in 1:out_h
-#       h_start = (oh - 1) * kh + 1
-#       h_end = oh * kh
-#
-#       for ow in 1:out_w
-#         w_start = (ow - 1) * kw + 1
-#         w_end = ow * kw
-#
-#         best = X[c, h_start, w_start]
-#
-#         for i in h_start:h_end
-#           for j in w_start:w_end
-#             v = X[c, i, j]
-#             if v > best
-#               best = v
-#             end
-#           end
-#         end
-#
-#         Y[c, oh, ow] = best
-#       end
-#     end
-#   end
-#
-#   return nothing
-# end
 function primal!(y::GraphNode{:maxpool,1})
   x, = y.args
   _maxpool_primal!(y.data, x.data)
   return nothing
 end
-# function _maxpool_primal!(Y::AbstractArray{T,3}, X::AbstractArray{T,3}) where {T}
 function _maxpool_primal!(Y::Array{T,3}, X::Array{T,3}) where {T}
   C, H, W = size(X)
   _, out_h, out_w = size(Y)
@@ -318,76 +223,29 @@ function _maxpool_primal!(Y::Array{T,3}, X::Array{T,3}) where {T}
   kh = H ÷ out_h
   kw = W ÷ out_w
 
-  @inbounds for c in 1:C
-    for oh in 1:out_h
-      h_start = (oh - 1) * kh + 1
-      h_end = oh * kh
+  for c in 1:C, oh in 1:out_h
+    h_start = (oh - 1) * kh + 1
+    h_end = oh * kh
 
-      for ow in 1:out_w
-        w_start = (ow - 1) * kw + 1
-        w_end = ow * kw
+    for ow in 1:out_w
+      w_start = (ow - 1) * kw + 1
+      w_end = ow * kw
 
-        best = X[c, h_start, w_start]
+      best = X[c, h_start, w_start]
 
-        for i in h_start:h_end
-          for j in w_start:w_end
-            v = X[c, i, j]
-            if v > best
-              best = v
-            end
-          end
+      for i in h_start:h_end, j in w_start:w_end
+        v = X[c, i, j]
+        if v > best
+          best = v
         end
-
-        Y[c, oh, ow] = best
       end
+
+      Y[c, oh, ow] = best
     end
   end
 
   return nothing
 end
-# function adjoint!(y::GraphNode{:maxpool,1})
-#   x, = y.args
-#   X = x.data
-#   GY = y.grad
-#   XG = x.grad
-#
-#   C, H, W = size(X)
-#   _, out_h, out_w = size(y.data)
-#
-#   kh = H ÷ out_h
-#   kw = W ÷ out_w
-#
-#   @inbounds for c in 1:C
-#     for oh in 1:out_h
-#       h_start = (oh - 1) * kh + 1
-#       h_end = oh * kh
-#
-#       for ow in 1:out_w
-#         w_start = (ow - 1) * kw + 1
-#         w_end = ow * kw
-#
-#         best_i = h_start
-#         best_j = w_start
-#         best = X[c, h_start, w_start]
-#
-#         for i in h_start:h_end
-#           for j in w_start:w_end
-#             v = X[c, i, j]
-#             if v > best
-#               best = v
-#               best_i = i
-#               best_j = j
-#             end
-#           end
-#         end
-#
-#         XG[c, best_i, best_j] += GY[c, oh, ow]
-#       end
-#     end
-#   end
-#
-#   return nothing
-# end
 function adjoint!(y::GraphNode{:maxpool,1})
   x, = y.args
   _maxpool_adjoint!(x.grad, y.grad, x.data, y.data)
@@ -406,32 +264,28 @@ function _maxpool_adjoint!(
   kh = H ÷ out_h
   kw = W ÷ out_w
 
-  @inbounds for c in 1:C
-    for oh in 1:out_h
-      h_start = (oh - 1) * kh + 1
-      h_end = oh * kh
+  for c in 1:C, oh in 1:out_h
+    h_start = (oh - 1) * kh + 1
+    h_end = oh * kh
 
-      for ow in 1:out_w
-        w_start = (ow - 1) * kw + 1
-        w_end = ow * kw
+    for ow in 1:out_w
+      w_start = (ow - 1) * kw + 1
+      w_end = ow * kw
 
-        best_i = h_start
-        best_j = w_start
-        best = X[c, h_start, w_start]
+      best_i = h_start
+      best_j = w_start
+      best = X[c, h_start, w_start]
 
-        for i in h_start:h_end
-          for j in w_start:w_end
-            v = X[c, i, j]
-            if v > best
-              best = v
-              best_i = i
-              best_j = j
-            end
-          end
+      for i in h_start:h_end, j in w_start:w_end
+        v = X[c, i, j]
+        if v > best
+          best = v
+          best_i = i
+          best_j = j
         end
-
-        XG[c, best_i, best_j] += GY[c, oh, ow]
       end
+
+      XG[c, best_i, best_j] += GY[c, oh, ow]
     end
   end
 
@@ -461,7 +315,7 @@ function primal!(y::GraphNode{:dropout,3})
   zeroT = zero(T)
 
   if !IS_TRAINING[]
-    @inbounds for i in eachindex(xd, yd, md)
+    for i in eachindex(xd, yd, md)
       md[i] = oneT
       yd[i] = xd[i]
     end
@@ -470,7 +324,7 @@ function primal!(y::GraphNode{:dropout,3})
 
   scale = inv(oneT - p)
 
-  @inbounds for i in eachindex(xd, yd, md)
+  for i in eachindex(xd, yd, md)
     if rand() < p
       md[i] = zeroT
       yd[i] = zeroT
@@ -488,7 +342,7 @@ function adjoint!(y::GraphNode{:dropout,3})
   yg = y.grad
   md = masknode.data
 
-  @inbounds for i in eachindex(xg, yg, md)
+  for i in eachindex(xg, yg, md)
     xg[i] += yg[i] * md[i]
   end
 
@@ -510,25 +364,5 @@ function adjoint!(z::GraphNode{:lce})
   ex = exp.(x.data .- maximum(x.data))
   soft = ex ./ sum(ex)
   x.grad .+= z.grad[1] .* (soft .- y.data)
-  return nothing
-end
-
-function primal!(y::GraphNode{:softmax})
-  x = y.args[1]
-  xd = x.data
-  yd = y.data
-  m = maximum(xd)
-  @. yd = exp(xd - m)
-  s = sum(yd)
-  @. yd = yd / s
-  return nothing
-end
-function adjoint!(y::GraphNode{:softmax})
-  x = y.args[1]
-  s = y.data
-  g = y.grad
-  xg = x.grad
-  gs = sum(g .* s)
-  @. xg += s * (g - gs)
   return nothing
 end

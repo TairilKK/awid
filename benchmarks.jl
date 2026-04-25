@@ -3,25 +3,31 @@ using MLDatasets
 using Random
 using Printf
 
-# Data ------------------------------------------------------------------------
-train_data = MLDatasets.FashionMNIST(split=:train)
-test_data = MLDatasets.FashionMNIST(split=:test)
-
-function prepare_data(data)
-    N = length(data)
-    x_data = Vector{Array{Float32,3}}(undef, N)
-    d_data = Vector{Vector{Float32}}(undef, N)
-    for i in 1:N
-        x_data[i] = reshape(Float32.(data.features[:, :, i]), 1, 28, 28)
-        d = zeros(Float32, 10)
-        d[data.targets[i]+1] = 1.0f0
-        d_data[i] = d
+function data()
+    function prepare_data(data)
+        N = length(data)
+        x_data = Vector{Array{Float32,3}}(undef, N)
+        d_data = Vector{Vector{Float32}}(undef, N)
+        for i in 1:N
+            x_data[i] = reshape(Float32.(data.features[:, :, i]), 1, 28, 28)
+            d = zeros(Float32, 10)
+            d[data.targets[i]+1] = 1.0
+            d_data[i] = d
+        end
+        return x_data, d_data
     end
-    return x_data, d_data
+
+    train_data = MLDatasets.FashionMNIST(split=:train)
+    test_data = MLDatasets.FashionMNIST(split=:test)
+
+    x_train, d_train = prepare_data(train_data)
+    x_test, d_test = prepare_data(test_data)
+
+    return (x_train, d_train, x_test, d_test)
 end
 
-x_train, d_train = prepare_data(train_data)
-x_test, d_test = prepare_data(test_data)
+x_train, d_train, x_test, d_test = data()
+
 
 # Model -----------------------------------------------------------------------
 include("base.jl")
