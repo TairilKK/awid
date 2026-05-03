@@ -149,6 +149,22 @@ test(model, x_test, d_test)
 total_time = 0.0
 total_allocs = 0
 
+println("\nRunning warmup to preallocate memory...")
+
+warmup_stats = @timed begin
+    dummy_x = x_train[1]
+    dummy_d = d_train[1]
+    
+    zerograd!(model)
+    forward!(model, input => dummy_x, target => dummy_d)
+    backward!(model)
+    zerograd!(model)
+end
+
+total_allocs += warmup_stats.bytes
+
+println("Memory preallocated. (Warmup allocated: ", round(warmup_stats.bytes / 1024^2, digits=2), " MB)")
+
 println("\nRunning training...")
 for epoch in 1:settings.epoch
     global IS_TRAINING = true
