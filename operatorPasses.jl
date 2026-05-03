@@ -17,13 +17,13 @@ end
 
 function primal!(y::GraphNode{:mul,2})
   W, x = y.args
-  y.data = W.data * x.data
+  mul!(y.data, W.data, x.data)
   return nothing
 end
 function adjoint!(y::GraphNode{:mul,2})
   W, x = y.args
-  W.grad += y.grad * x.data'
-  x.grad += W.data' * y.grad
+  mul!(W.grad, y.grad, x.data', 1, 1) 
+  mul!(x.grad, W.data', y.grad, 1, 1)
   return nothing
 end
 
@@ -44,13 +44,13 @@ end
 
 function primal!(z::GraphNode{:add,2})
   x, y = z.args
-  z.data = x.data .+ y.data
+  z.data .= x.data .+ y.data
   return nothing
 end
 function adjoint!(z::GraphNode{:add,2})
   x, y = z.args
-  x.grad += z.grad
-  y.grad += z.grad
+  x.grad .+= z.grad 
+  y.grad .+= z.grad
   return nothing
 end
 
