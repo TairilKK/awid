@@ -92,8 +92,7 @@ function test(model, x_test, d_test)
     end
 
     acc = round(correct / total * 100, digits=2)
-    println("Accuracy = ", acc, "% (", correct, "/", total, ")")
-    return nothing
+    return acc
 end
 
 function train_sgd!(model, incdices, x_train, d_train)
@@ -150,12 +149,24 @@ end
 println("\nRunning initial test...")
 test(model, x_test, d_test)
 
+total_time = 0.0
+total_allocs = 0
+
 println("\nRunning training...")
-@time for _ in 1:settings.epoch
-    L = train_minibatch!(model, settings.indices, settings.batch_size, x_train, d_train, settings.learning_rate)
+for epoch in 1:settings.epoch
+    stats = @timed train_minibatch!(model, settings.indices, settings.batch_size, x_train, d_train, settings.learning_rate)
+    L = stats.value
+    global total_time += stats.time
+    global total_allocs += stats.bytes
+
+    train_acc = test(model, x_train, d_train)
+    test_acc = test(model, x_test, d_test)
+
+    println("Epoch ", epoch, ": train_acc = ", train_acc, "%, test_acc = ", test_acc, "%")
 end
 
-println("\nRunning final test...")
-test(model, x_test, d_test)
+println("\n--- Training Stats for train_minibatch! ---")
+println("Total Time: ", round(total_time, digits=3), " seconds")
+println("Total Allocations: ", round(total_allocs / 1024^3, digits=2), " GB")
 
 println("\nProgram finished.")
