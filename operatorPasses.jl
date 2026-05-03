@@ -34,11 +34,7 @@ function primal!(y::GraphNode{:relu,1})
 end
 function adjoint!(y::GraphNode{:relu,1})
   x, = y.args
-  for i in 1:length(x.data)
-    if x.data[i] == y.data[i]
-      x.grad[i] += y.grad[i]
-    end
-  end
+  x.grad .+= y.grad .* (x.data .== y.data)
   return nothing
 end
 
