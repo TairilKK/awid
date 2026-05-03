@@ -84,9 +84,9 @@ function adjoint!(y::GraphNode{:sigmoid,1})
   return nothing
 end
 
-function get_cache_matrix!(cache::Dict{Symbol,Any}, key::Symbol, T, dims::Tuple)
-  if !haskey(cache, key) || size(cache[key]) != dims || eltype(cache[key]) != T
-    cache[key] = Matrix{T}(undef, dims...)
+function get_cache_matrix!(cache::Dict{Symbol,Matrix{Float32}}, key::Symbol, dims::Tuple)
+  if !haskey(cache, key) || size(cache[key]) != dims
+    cache[key] = Matrix{Float32}(undef, dims...)
   end
   return cache[key]
 end
@@ -142,7 +142,7 @@ function primal!(y::GraphNode{:conv,3})
 
   T = promote_type(eltype(X), eltype(W))
 
-  Xcol = get_cache_matrix!(y.cache, :Xcol, T, (IC * KH * KW, out_h * out_w))
+  Xcol = get_cache_matrix!(y.cache, :Xcol, (IC * KH * KW, out_h * out_w))
 
   im2col_pad!(Xcol, X, KH, KW, pad)
 
@@ -192,16 +192,16 @@ function adjoint!(y::GraphNode{:conv,3})
 
   T = promote_type(eltype(W), eltype(X), eltype(GY))
 
-  Xcol = get_cache_matrix!(y.cache, :Xcol, T, (IC * KH * KW, out_h * out_w))
+  Xcol = get_cache_matrix!(y.cache, :Xcol, (IC * KH * KW, out_h * out_w))
   im2col_pad!(Xcol, X, KH, KW, pad)
 
   Wcol = reshape(W, OC, IC * KH * KW)
   GYcol = reshape(GY, OC, out_h * out_w)
 
-  dWcol = get_cache_matrix!(y.cache, :dWcol, T, (OC, IC * KH * KW))
+  dWcol = get_cache_matrix!(y.cache, :dWcol, (OC, IC * KH * KW))
   mul!(dWcol, GYcol, Xcol')
 
-  dXcol = get_cache_matrix!(y.cache, :dXcol, T, (IC * KH * KW, out_h * out_w))
+  dXcol = get_cache_matrix!(y.cache, :dXcol, (IC * KH * KW, out_h * out_w))
   mul!(dXcol, Wcol', GYcol)
 
   kernels.grad .+= reshape(dWcol, size(W)...)
