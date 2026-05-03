@@ -98,23 +98,33 @@ function im2col_pad!(cols, X, KH, KW, pad)
   out_w = Wp - KW + 1
 
   col = 1
-  for ow in 1:out_w, oh in 1:out_h
-    idx = 1
-    for j in 1:KW, i in 1:KH
-      hi = oh + i - pad - 1
-      wi = ow + j - pad - 1
-      for ic in 1:IC
-        if 1 <= hi <= H && 1 <= wi <= W
-          cols[idx, col] = X[ic, hi, wi]
-        else
-          cols[idx, col] = zero(eltype(X))
+  for ow in 1:out_w
+    for oh in 1:out_h
+      idx = 1
+      for j in 0:KW-1
+        # Calculate the actual horizontal index in X
+        iw = ow + j - pad
+        for i in 0:KH-1
+          # Calculate the actual vertical index in X
+          ih = oh + i - pad
+          
+          # If we are in the "pad zone", value is 0. 
+          # Otherwise, pull from X.
+          in_bounds = (ih >= 1 && ih <= H && iw >= 1 && iw <= W)
+          
+          for ic in 1:IC
+            if in_bounds
+                cols[idx, col] = X[ic, ih, iw]
+            else
+                cols[idx, col] = zero(eltype(X))
+            end
+            idx += 1
+          end
         end
-        idx += 1
       end
+      col += 1
     end
-    col += 1
   end
-
   return cols
 end
 function primal!(y::GraphNode{:conv,3})
