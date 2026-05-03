@@ -303,51 +303,33 @@ function adjoint!(y::GraphNode{:flatten,1})
 end
 
 function primal!(y::GraphNode{:dropout,3})
-  x, probnode, masknode = y.args
-  p = probnode.data[1]
+    x, mask, p_node = y.args
+    p = p_node.data[1]
+    global IS_TRAINING
 
-  xd = x.data
-  yd = y.data
-  md = masknode.data
+    if IS_TRAINING[]
+        mask.data = rand(size(x.data)...) .> p
 
-  T = eltype(xd)
-  oneT = one(T)
-  zeroT = zero(T)
-
-  if !IS_TRAINING[]
-    for i in eachindex(xd, yd, md)
-      md[i] = oneT
-      yd[i] = xd[i]
-    end
-    return nothing
-  end
-
-  scale = inv(oneT - p)
-
-  for i in eachindex(xd, yd, md)
-    if rand() < p
-      md[i] = zeroT
-      yd[i] = zeroT
+        y.data .= (x.data .* mask.data) ./ (1.0 - p)
     else
-      md[i] = scale
-      yd[i] = xd[i] * scale
+        y.data .= x.data
     end
-  end
-
-  return nothing
 end
 function adjoint!(y::GraphNode{:dropout,3})
-  x, probnode, masknode = y.args
-  xg = x.grad
-  yg = y.grad
-  md = masknode.data
+    x, mask, p_node = y.args
+    p = p_node.data[1]
+    global IS_TRAINING
 
-  for i in eachindex(xg, yg, md)
-    xg[i] += yg[i] * md[i]
-  end
-
-  return nothing
+    if IS_TRAINING[]
+        # Gradient only flows through "active" neurons,
+        x.grad .+= (y.grad .* mask.data) ./ (1.0 - p)
+    else
+        # Even though we are not training in adjoint!,
+        # the gradient flows through normally
+        x.grad .+= y.grad
+    end
 end
+
 
 function primal!(z::GraphNode{:lce})
   x, y = z.args
