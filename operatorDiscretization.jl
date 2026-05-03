@@ -58,9 +58,6 @@ function (y::MaxPool)(x)
 
   C, H, W = size(x.data)
 
-  @assert H % kh == 0
-  @assert W % kw == 0
-
   out_h = H ÷ kh
   out_w = W ÷ kw
 

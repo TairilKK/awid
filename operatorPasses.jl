@@ -136,11 +136,9 @@ function primal!(y::GraphNode{:conv,3})
 
   OC, IC, KH, KW = size(W)
   ICx, H, WW = size(X)
-  @assert IC == ICx
 
   out_h = H + 2 * pad - KH + 1
   out_w = WW + 2 * pad - KW + 1
-  @assert size(Y) == (OC, out_h, out_w)
 
   T = promote_type(eltype(X), eltype(W))
 
@@ -192,9 +190,6 @@ function adjoint!(y::GraphNode{:conv,3})
   OC, IC, KH, KW = size(W)
   ICx, H, WW = size(X)
   OCy, out_h, out_w = size(GY)
-
-  @assert IC == ICx
-  @assert OC == OCy
 
   T = promote_type(eltype(W), eltype(X), eltype(GY))
 

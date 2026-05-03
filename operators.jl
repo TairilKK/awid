@@ -33,6 +33,5 @@ conv(kernel, pair; pad=0, bias=true) =
 maxpool(kernel) = MaxPool(kernel)
 flatten() = Flatten()
 function dropout(p::Float32)
-  @assert 0.0f0 <= p <= 1.0f0
   return DropOut(p)
 end
