@@ -6,13 +6,12 @@ using LinearAlgebra
 
 function primal!(z::GraphNode{:bce,2})
   x, y = z.args
-  z.data = -(y.data .* log.(x.data) + (1 .- y.data) .* log.(1 .- x.data))
+  z.data .= .- (y.data .* log.(x.data) .+ (1 .- y.data) .* log.(1 .- x.data))
   return nothing
 end
 function adjoint!(z::GraphNode{:bce,2})
   x, y = z.args
-  x.grad -= y.data ./ x.data .* z.grad
-  x.grad += (1 .- y.data) ./ (1 .- x.data) .* z.grad
+  x.grad .+= ((1 .- y.data) ./ (1 .- x.data) .- (y.data ./ x.data)) .* z.grad
   return nothing
 end
 
@@ -62,8 +61,8 @@ function primal!(z::GraphNode{:dot,2})
 end
 function adjoint!(z::GraphNode{:dot,2})
   x, y = z.args
-  x.grad += y.data .* z.grad
-  y.grad += x.data .* z.grad
+  x.grad .+= y.data .* z.grad
+  y.grad .+= x.data .* z.grad
   return nothing
 end
 
@@ -80,12 +79,12 @@ end
 
 function primal!(y::GraphNode{:sigmoid,1})
   x, = y.args
-  y.data = 1 ./ (1 .+ exp.(-x.data))
+  y.data .= 1 ./ (1 .+ exp.(.-x.data))
   return nothing
 end
 function adjoint!(y::GraphNode{:sigmoid,1})
   x, = y.args
-  x.grad += exp.(-x.data) ./ (1 .+ exp.(-x.data)) .^ 2 .* y.grad
+  x.grad .+= exp.(.-x.data) ./ (1 .+ exp.(.-x.data)).^2 .* y.grad
   return nothing
 end
 
