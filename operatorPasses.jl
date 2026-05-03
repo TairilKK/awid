@@ -306,7 +306,7 @@ function primal!(y::GraphNode{:dropout,3})
     p = p_node.data[1]
     global IS_TRAINING
 
-    if IS_TRAINING[]
+    if IS_TRAINING
         rand!(mask.data) 
         @. mask.data = mask.data > p
         @. y.data = (x.data * mask.data) / (1.0f0 - p)
@@ -319,7 +319,7 @@ function adjoint!(y::GraphNode{:dropout,3})
     p = p_node.data[1]
     global IS_TRAINING
 
-    if IS_TRAINING[]
+    if IS_TRAINING
         # Gradient only flows through "active" neurons,
         x.grad .+= (y.grad .* mask.data) ./ (1.0f0 - p)
     else

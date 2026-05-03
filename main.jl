@@ -76,7 +76,6 @@ println("  number of training samples = ", length(settings.indices))
 using Random
 
 function test(model, x_test, d_test)
-    evalmode!()
     correct = 0
     total = length(x_test)
 
@@ -96,7 +95,6 @@ function test(model, x_test, d_test)
 end
 
 function train_sgd!(model, incdices, x_train, d_train)
-    trainmode!()
     shuffle!(incdices)
     L = 0.0f0
 
@@ -115,7 +113,6 @@ end
 using ProgressMeter
 
 function train_minibatch!(model, indices, batch_size, x_train, d_train, learning_rate)
-    trainmode!()
     shuffle!(indices)
     n_samples = length(indices)
     n_batches = cld(n_samples, batch_size)
@@ -154,11 +151,13 @@ total_allocs = 0
 
 println("\nRunning training...")
 for epoch in 1:settings.epoch
+    global IS_TRAINING = true
     stats = @timed train_minibatch!(model, settings.indices, settings.batch_size, x_train, d_train, settings.learning_rate)
     L = stats.value
     global total_time += stats.time
     global total_allocs += stats.bytes
 
+    global IS_TRAINING = false
     train_acc = test(model, x_train, d_train)
     test_acc = test(model, x_test, d_test)
 
