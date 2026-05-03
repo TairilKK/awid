@@ -188,8 +188,7 @@ function adjoint!(y::GraphNode{:conv,3})
   GY = y.grad
 
   OC, IC, KH, KW = size(W)
-  ICx, H, WW = size(X)
-  OCy, out_h, out_w = size(GY)
+  _, out_h, out_w = size(GY)
 
   T = promote_type(eltype(W), eltype(X), eltype(GY))
 
