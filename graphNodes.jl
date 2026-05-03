@@ -1,27 +1,28 @@
 # bad: Backward Automatic Differentiation
-mutable struct GraphNode{OP,N}
+mutable struct GraphNode{OP,N,T<:AbstractArray{Float32}}
   args::NTuple{N,GraphNode}
-  grad::Array{Float32}
-  data::Array{Float32}
+  grad::T
+  data::T
   cache::Dict{Symbol,Any}
 end
 
-const GraphWeight = GraphNode{:weight,0}
-const GraphTensor = GraphNode{:tensor,0}
-function GraphNode(data::T, trainable=false) where T
+const GraphWeight = GraphNode{:weight,0,Array{Float32,N}} where N
+const GraphTensor = GraphNode{:tensor,0,Array{Float32,N}} where N
+
+function GraphNode(data::T, trainable=false) where {T<:AbstractArray{Float32}}
   cache = Dict{Symbol,Any}()
   if trainable
-    return GraphNode{:weight,0}((), zero(data), data, cache)
+    return GraphNode{:weight,0,T}((), zero(data), data, cache)
   else
-    return GraphNode{:tensor,0}((), zero(data), data, cache)
+    return GraphNode{:tensor,0,T}((), zero(data), data, cache)
   end
 end
 
-function GraphNode(op::Symbol, args::Tuple, data::T) where T
+function GraphNode(op::Symbol, args::Tuple, data::T) where {T<:AbstractArray{Float32}}
   N = length(args)
   grad = similar(data)
   cache = Dict{Symbol,Any}()
-  return GraphNode{op,N}(args, grad, data, cache)
+  return GraphNode{op,N,T}(args, grad, data, cache)
 end
 
 function graph(node::GraphNode)

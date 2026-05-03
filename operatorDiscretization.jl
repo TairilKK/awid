@@ -39,7 +39,7 @@ function (y::Conv)(x)
   kh, kw = y.kernel_size
   pad = y.pad
 
-  padnode = GraphNode([pad])
+  padnode = GraphNode(Float32[pad])
   kernels = GraphNode(0.01f0 * randn(Float32, out_channels, in_channels, kh, kw), true)
 
   _, H, W = size(x.data)
