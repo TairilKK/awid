@@ -197,13 +197,12 @@ function adjoint!(y::GraphNode{:conv,3})
   Wcol = reshape(W, OC, IC * KH * KW)
   GYcol = reshape(GY, OC, out_h * out_w)
 
-  dWcol = get_cache_matrix!(y.cache, :dWcol, (OC, IC * KH * KW))
-  mul!(dWcol, GYcol, Xcol')
+  dW_view = reshape(kernels.grad, OC, IC * KH * KW)
+  mul!(dW_view, GYcol, Xcol', 1, 1)
 
   dXcol = get_cache_matrix!(y.cache, :dXcol, (IC * KH * KW, out_h * out_w))
   mul!(dXcol, Wcol', GYcol)
 
-  kernels.grad .+= reshape(dWcol, size(W)...)
   col2im_pad!(x.grad, dXcol, KH, KW, pad)
 
   return nothing
