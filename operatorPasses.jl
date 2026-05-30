@@ -211,67 +211,27 @@ end
 
 function primal!(y::GraphNode{:maxpool,1})
   x, = y.args
-  _maxpool_primal!(y.data, x.data)
+  _maxpool_primal!(y.data, x.data, y.cache)
   return nothing
 end
-function _maxpool_primal!(Y::Array{T,3}, X::Array{T,3}) where {T}
+function _maxpool_primal!(Y::Array{T,3}, X::Array{T,3}, cache::Dict{Symbol,Matrix{Float32}}) where {T}
   C, H, W = size(X)
   _, out_h, out_w = size(Y)
 
   kh = H ÷ out_h
   kw = W ÷ out_w
 
-  for c in 1:C, oh in 1:out_h
-    h_start = (oh - 1) * kh + 1
-    h_end = oh * kh
-
-    for ow in 1:out_w
-      w_start = (ow - 1) * kw + 1
-      w_end = ow * kw
-
-      best = X[c, h_start, w_start]
-
-      for i in h_start:h_end, j in w_start:w_end
-        v = X[c, i, j]
-        if v > best
-          best = v
-        end
-      end
-
-      Y[c, oh, ow] = best
-    end
-  end
-
-  return nothing
-end
-function adjoint!(y::GraphNode{:maxpool,1})
-  x, = y.args
-  _maxpool_adjoint!(x.grad, y.grad, x.data, y.data)
-  return nothing
-end
-
-function _maxpool_adjoint!(
-  XG::AbstractArray{T,3},
-  GY::AbstractArray{T,3},
-  X::AbstractArray{T,3},
-  Y::AbstractArray{T,3},
-) where {T}
-  C, H, W = size(X)
-  _, out_h, out_w = size(Y)
-
-  kh = H ÷ out_h
-  kw = W ÷ out_w
+  idx_mat = get_cache_matrix!(cache, :maxidx, (C, out_h * out_w))
 
   for c in 1:C, oh in 1:out_h
     h_start = (oh - 1) * kh + 1
-    h_end = oh * kh
+    h_end   = oh * kh
 
     for ow in 1:out_w
       w_start = (ow - 1) * kw + 1
-      w_end = ow * kw
+      w_end   = ow * kw
 
-      best_i = h_start
-      best_j = w_start
+      best_i, best_j = h_start, w_start
       best = X[c, h_start, w_start]
 
       for i in h_start:h_end, j in w_start:w_end
@@ -283,8 +243,31 @@ function _maxpool_adjoint!(
         end
       end
 
-      XG[c, best_i, best_j] += GY[c, oh, ow]
+      Y[c, oh, ow] = best
+      idx_mat[c, (oh - 1) * out_w + ow] = Float32(LinearIndices(X)[c, best_i, best_j])
     end
+  end
+
+  return nothing
+end
+function adjoint!(y::GraphNode{:maxpool,1})
+  x, = y.args
+  _maxpool_adjoint!(x.grad, y.grad, y.cache)
+  return nothing
+end
+
+function _maxpool_adjoint!(
+  XG::AbstractArray{T,3},
+  GY::AbstractArray{T,3},
+  cache::Dict{Symbol,Matrix{Float32}},
+) where {T}
+  C, _, _ = size(XG)
+  _, out_h, out_w = size(GY)
+
+  idx_mat = cache[:maxidx]
+  for c in 1:C, oh in 1:out_h, ow in 1:out_w
+    li = Int(idx_mat[c, (oh - 1) * out_w + ow])
+    XG[li] += GY[c, oh, ow]
   end
 
   return nothing
