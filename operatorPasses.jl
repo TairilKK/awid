@@ -193,7 +193,6 @@ function adjoint!(y::GraphNode{:conv,3})
   T = promote_type(eltype(W), eltype(X), eltype(GY))
 
   Xcol = get_cache_matrix!(y.cache, :Xcol, (IC * KH * KW, out_h * out_w))
-  im2col_pad!(Xcol, X, KH, KW, pad)
 
   Wcol = reshape(W, OC, IC * KH * KW)
   GYcol = reshape(GY, OC, out_h * out_w)
